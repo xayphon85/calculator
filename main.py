@@ -1,13 +1,9 @@
 import math
 from collections import deque
-from datetime import datetime, timezone
-from typing import List, Optional, Union
-
-from fastapi import FastAPI, Query
+from datetime import datetime
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from asteval import Interpreter
-
 from calculator import expand_percent
 
 HISTORY_MAX = 1000
@@ -24,56 +20,46 @@ app.add_middleware(
 
 # ---------- Safe evaluator ----------
 aeval = Interpreter(minimal=True, usersyms={"pi": math.pi, "e": math.e})
-
-# ---------- Models ----------
-class HistoryItem(BaseModel):
-    expr: str                    # what user entered (pretty string your UI sends)
-    result: Union[int, float, str]
-    ts: str                      # ISO timestamp (UTC)
+"""
+def expand_percent(expr: str) -> str:
+    #Replace invalid math symbols with Python equivalents
+    replacements = {
+        "×": "*",  # multiplication
+        "÷": "/",  # division
+        "−": "-",  # minus (U+2212 to ASCII hyphen)
+    }
+    for bad, good in replacements.items():
+        expr = expr.replace(bad, good)
+    return expr
+"""
 @app.post("/calculate")
 def calculate(expr: str):
     try:
+       # expr_norm = expand_percent(expr)
+
+        expr = expr.replace("×", "*").replace("÷", "/")
         code = expand_percent(expr)
         result = aeval(code)
         if aeval.error:
             msg = "; ".join(str(e.get_error()) for e in aeval.error)
             aeval.error.clear()
             return {"ok": False, "expr": expr, "result": "", "error": msg}
-
         # TODO: Add history
-           # ---- Add to history on success ----
-        item = HistoryItem(
-            expr=expr,
-            result=result,
-            ts=datetime.now(timezone.utc).isoformat()
-        )
-        history.append(item.model_dict())
-
+        history.append({"expr": expr, "result": result})        
         return {"ok": True, "expr": expr, "result": result, "error": ""}
     except Exception as e:
         return {"ok": False, "expr": expr, "error": str(e)}
-        
-        # ================
-        
-    
 
 # TODO GET /hisory
+@app.get("/history")
+def get_history(limit: int = 50):
+    """Get calculation history"""
+    return list(history)[-limit:]
 
 # TODO DELETE /history
-# ---------- History: get / add / clear ----------
-@app.get("/history", response_model=List[HistoryItem])
-def get_history(limit: Optional[int] = Query(default=50, ge=1)):
-    """
-    Return most-recent-first history items, up to `limit`.
-    """
-    items = list(history)[-limit:][::-1]
-    return items
-
-
-@app.post("/history", response_model=HistoryItem)
-def add_history(item: HistoryItem):
-    """
-    Optional manual insert (not used by your UI, but handy for tests).
-    """
-    history.append(item.model_dict())
-    return item
+@app.delete("/history")
+def clear_history():
+    """Clear calculation history"""
+    global calculation_history
+    history.clear()
+    return {"ok": True, "message": "History cleared"}

@@ -1,5 +1,4 @@
 import re
-
 _percent_pair = re.compile(r"""
     (?P<a>\d+(?:\.\d+)?)
     \s*(?P<op>[+\-*/])\s*
@@ -25,6 +24,5 @@ def expand_percent(expr: str) -> str:
         s = s[:m.start()] + repl + s[m.end():]
 
     # Replace B%
-    s = _number_percent.sub(lambda m: f"({m.group('n')}/100)", s)
+    s = _number_percent.sub(lambda m: f"({m.group('n')}/100)",s)
     return s
-

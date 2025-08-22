@@ -31,5 +31,4 @@ def test_invalid_expr_returns_ok_false():
     assert data["ok"] is False
     assert "error" in data and data["error"] != ""
 
-
 # TODO Add more tests
